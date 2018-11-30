@@ -33,8 +33,6 @@ func (c *Client) newRequest(method, urlStr string, body io.Reader) (*http.Reques
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
 
-	req.SetBasicAuth(c.accountSid, c.authToken)
-
 	return req, nil
 }
 
@@ -74,17 +72,17 @@ func (c *Client) SetMute(conferenceSid, callSid string, muted bool) error {
 
 	req, err := c.newRequest(http.MethodPost, url, body)
 	if err != nil {
-		return errors.WithMessage(err, "twilio.Client.ToggleMute()")
+		return errors.WithMessage(err, "twilio.Client.SetMute()")
 	}
 
 	res, err := c.httpClient.Do(req)
 	if err != nil {
-		return errors.WithMessage(err, "twilio.Client.ToggleMute()")
+		return errors.WithMessage(err, "twilio.Client.SetMute()")
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("twilio.Client.ToggleMute(): expected status code 200, got %d", res.StatusCode)
+		return fmt.Errorf("twilio.Client.SetMute(): expected status code 200, got %d", res.StatusCode)
 	}
 
 	return nil
