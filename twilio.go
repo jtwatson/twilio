@@ -1,6 +1,7 @@
 package twilio
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"go.opencensus.io/trace"
 )
 
 var baseURL = "https://api.twilio.com/2010-04-01"
@@ -24,11 +26,12 @@ func New(client *http.Client, accountSid, authToken string) *Client {
 	return &Client{httpClient: client, accountSid: accountSid, authToken: authToken}
 }
 
-func (c *Client) newRequest(method, urlStr string, body io.Reader) (*http.Request, error) {
+func (c *Client) newRequest(ctx context.Context, method, urlStr string, body io.Reader) (*http.Request, error) {
 	req, err := http.NewRequest(method, urlStr, body)
 	if err != nil {
 		return nil, errors.WithMessage(err, "newRequest()")
 	}
+	req = req.WithContext(ctx)
 	req.SetBasicAuth(c.accountSid, c.authToken)
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Content-Type", "application/x-www-form-urlencoded")
@@ -37,14 +40,17 @@ func (c *Client) newRequest(method, urlStr string, body io.Reader) (*http.Reques
 }
 
 // DisconnectCall will disconnect the Call associated with callSids
-func (c *Client) DisconnectCall(callSid string) error {
+func (c *Client) DisconnectCall(ctx context.Context, callSid string) error {
+	ctx, span := trace.StartSpan(ctx, "twilio.Client.DisconnectCall()")
+	defer span.End()
+
 	params := make(url.Values)
 	params.Add("Status", "completed")
 	body := strings.NewReader(params.Encode())
 
 	url := fmt.Sprintf("%s/Accounts/%s/Calls/%s.json", baseURL, c.accountSid, callSid)
 
-	req, err := c.newRequest(http.MethodPost, url, body)
+	req, err := c.newRequest(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return errors.WithMessage(err, "twilio.Client.DisconnectCall()")
 	}
@@ -63,14 +69,17 @@ func (c *Client) DisconnectCall(callSid string) error {
 }
 
 // SetMute will set the mute state for the Call associated with callSids
-func (c *Client) SetMute(conferenceSid, callSid string, muted bool) error {
+func (c *Client) SetMute(ctx context.Context, conferenceSid, callSid string, muted bool) error {
+	ctx, span := trace.StartSpan(ctx, "twilio.Client.SetMute()")
+	defer span.End()
+
 	params := make(url.Values)
 	params.Add("Muted", fmt.Sprintf("%t", muted))
 	body := strings.NewReader(params.Encode())
 
 	url := fmt.Sprintf("%s/Accounts/%s/Conferences/%s/Participants/%s.json", baseURL, c.accountSid, conferenceSid, callSid)
 
-	req, err := c.newRequest(http.MethodPost, url, body)
+	req, err := c.newRequest(ctx, http.MethodPost, url, body)
 	if err != nil {
 		return errors.WithMessage(err, "twilio.Client.SetMute()")
 	}
@@ -89,7 +98,9 @@ func (c *Client) SetMute(conferenceSid, callSid string, muted bool) error {
 }
 
 // CallResource recieves call resource details
-func (c *Client) CallResource(callSid string) {
+func (c *Client) CallResource(ctx context.Context, callSid string) {
+	ctx, span := trace.StartSpan(ctx, "twilio.Client.CallResource()")
+	defer span.End()
 
 }
 
@@ -117,6 +128,7 @@ type CallResource struct {
 	SubresourceUris SubresourceUris `json:"subresource_uris,omitempty"`
 }
 
+// SubresourceUris holds details for subresource uri's
 type SubresourceUris struct {
 	Notifications string `json:"notifications,omitempty"`
 	Recordings    string `json:"recordings,omitempty"`
