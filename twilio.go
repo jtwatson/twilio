@@ -2,12 +2,15 @@ package twilio
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/google/go-querystring/query"
 	"github.com/pkg/errors"
 	"go.opencensus.io/trace"
 )
@@ -97,39 +100,70 @@ func (c *Client) SetMute(ctx context.Context, conferenceSid, callSid string, mut
 	return nil
 }
 
-// CallResource recieves call resource details
-func (c *Client) CallResource(ctx context.Context, callSid string) {
+// CallResource receives call resource details
+func (c *Client) CallResource(ctx context.Context, callSid string) (*CallResource, error) {
 	ctx, span := trace.StartSpan(ctx, "twilio.Client.CallResource()")
 	defer span.End()
 
+	url := fmt.Sprintf("%s/Accounts/%s/Calls/%s.json", baseURL, c.accountSid, callSid)
+
+	req, err := c.newRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.CallResource()")
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.CallResource(): http.Do(")
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("twilio.Client.CallResource(): expected status code 200, got %d", res.StatusCode)
+	}
+
+	callResource := &CallResource{}
+
+	if err := json.NewDecoder(res.Body).Decode(callResource); err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.CallResource(): json.Decoder.Decode()")
+	}
+
+	return callResource, nil
 }
 
-// CallResource holds the details of a call resouce
-type CallResource struct {
-	Sid             string          `json:"sid,omitempty"`
-	DateCreated     string          `json:"date_created,omitempty"`
-	DateUpdated     string          `json:"date_updated,omitempty"`
-	ParentCallSid   string          `json:"parent_call_sid,omitempty"`
-	AccountSid      string          `json:"account_sid,omitempty"`
-	To              string          `json:"to,omitempty"`
-	From            string          `json:"from,omitempty"`
-	PhoneNumberSid  string          `json:"phone_number_sid,omitempty"`
-	Status          string          `json:"status,omitempty"`
-	StartTime       string          `json:"start_time,omitempty"`
-	EndTime         string          `json:"end_time,omitempty"`
-	Duration        string          `json:"duration,omitempty"`
-	Price           string          `json:"price,omitempty"`
-	Direction       string          `json:"direction,omitempty"`
-	AnsweredBy      string          `json:"answered_by,omitempty"`
-	APIVersion      string          `json:"api_version,omitempty"`
-	ForwardedFrom   string          `json:"forwarded_from,omitempty"`
-	CallerName      string          `json:"caller_name,omitempty"`
-	URI             string          `json:"uri,omitempty"`
-	SubresourceUris SubresourceUris `json:"subresource_uris,omitempty"`
-}
+// Call creates an outbound call returning the resulting CallResource
+func (c *Client) Call(ctx context.Context, call *Call) (*CallResource, error) {
+	ctx, span := trace.StartSpan(ctx, "twilio.Client.Call()")
+	defer span.End()
 
-// SubresourceUris holds details for subresource uri's
-type SubresourceUris struct {
-	Notifications string `json:"notifications,omitempty"`
-	Recordings    string `json:"recordings,omitempty"`
+	params, err := query.Values(call)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.Call(): query.Values()")
+	}
+
+	url := fmt.Sprintf("%s/Accounts/%s/Calls.json", baseURL, c.accountSid)
+	body := strings.NewReader(params.Encode())
+
+	req, err := c.newRequest(ctx, http.MethodPost, url, body)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.Call()")
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.Call(): http.Do(")
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("twilio.Client.Call(): expected status code 201, got %d", res.StatusCode)
+	}
+
+	callResource := &CallResource{}
+
+	if err := json.NewDecoder(res.Body).Decode(callResource); err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.Call(): json.Decoder.Decode()")
+	}
+
+	return callResource, nil
 }
