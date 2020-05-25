@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
@@ -65,7 +64,7 @@ func (c *Client) DisconnectCall(ctx context.Context, callSid string) error {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("twilio.Client.DisconnectCall(): expected status code 200, got %d", res.StatusCode)
+		return errors.WithMessage(decodeError(res.Body), "twilio.Client.DisconnectCall()")
 	}
 
 	return nil
@@ -94,7 +93,7 @@ func (c *Client) SetMute(ctx context.Context, conferenceSid, callSid string, mut
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("twilio.Client.SetMute(): expected status code 200, got %d", res.StatusCode)
+		return errors.WithMessage(decodeError(res.Body), "twilio.Client.SetMute()")
 	}
 
 	return nil
@@ -119,7 +118,7 @@ func (c *Client) CallResource(ctx context.Context, callSid string) (*CallResourc
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("twilio.Client.CallResource(): expected status code 200, got %d", res.StatusCode)
+		return nil, errors.WithMessage(decodeError(res.Body), "twilio.Client.CallResource()")
 	}
 
 	callResource := &CallResource{}
@@ -156,7 +155,7 @@ func (c *Client) Call(ctx context.Context, call *Call) (*CallResource, error) {
 	defer res.Body.Close()
 
 	if res.StatusCode != http.StatusCreated {
-		return nil, fmt.Errorf("twilio.Client.Call(): expected status code 201, got %d", res.StatusCode)
+		return nil, errors.WithMessage(decodeError(res.Body), "twilio.Client.Call()")
 	}
 
 	callResource := &CallResource{}

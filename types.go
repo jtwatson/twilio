@@ -1,5 +1,9 @@
 package twilio
 
+import (
+	"fmt"
+)
+
 // CallResource holds the details of a call resouce
 type CallResource struct {
 	Sid             string          `json:"sid,omitempty"`
@@ -75,4 +79,15 @@ type Call struct {
 	Trim                               string `url:"Trim,omitempty"`
 	Twiml                              string `url:"Twiml,omitempty"`
 	URL                                string `url:"Url,omitempty"`
+}
+
+type APIError struct {
+	Code     int    `json:"code"`
+	Message  string `json:"message"`
+	MoreInfo string `json:"more_info"`
+	Status   int    `json:"status"`
+}
+
+func (a *APIError) Error() string {
+	return fmt.Sprintf("APIError: %s: more_info: %s", a.Message, a.MoreInfo)
 }
