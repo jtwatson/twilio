@@ -99,7 +99,7 @@ func (c *Client) SetMute(ctx context.Context, conferenceSid, callSid string, mut
 	return nil
 }
 
-// CallResource receives call resource details
+// CallResource retrieves call details
 func (c *Client) CallResource(ctx context.Context, callSid string) (*CallResource, error) {
 	ctx, span := trace.StartSpan(ctx, "twilio.Client.CallResource()")
 	defer span.End()
@@ -165,4 +165,68 @@ func (c *Client) Call(ctx context.Context, call *Call) (*CallResource, error) {
 	}
 
 	return callResource, nil
+}
+
+// ConferenceResource retrieves conference details
+func (c *Client) ConferenceResource(ctx context.Context, conferenceSid string) (*ConferenceResource, error) {
+	ctx, span := trace.StartSpan(ctx, "twilio.Client.ConferenceResource()")
+	defer span.End()
+
+	url := fmt.Sprintf("%s/Accounts/%s/Conferences/%s.json", baseURL, c.accountSid, conferenceSid)
+
+	req, err := c.newRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.ConferenceResource()")
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.ConferenceResource(): http.Do(")
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.WithMessage(decodeError(res.Body), "twilio.Client.ConferenceResource()")
+	}
+
+	conferencecResource := &ConferenceResource{}
+
+	if err := json.NewDecoder(res.Body).Decode(conferencecResource); err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.ConferenceResource(): json.Decoder.Decode()")
+	}
+
+	return conferencecResource, nil
+}
+
+// ParticipantResource retrieves participant details
+func (c *Client) ParticipantResources(ctx context.Context, conferenceSid string) ([]ParticipantResource, error) {
+	ctx, span := trace.StartSpan(ctx, "twilio.Client.ParticipantResource()")
+	defer span.End()
+
+	url := fmt.Sprintf("%s/Accounts/%s/Conferences/%s/Participants.json", baseURL, c.accountSid, conferenceSid)
+
+	req, err := c.newRequest(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.ParticipantResource()")
+	}
+
+	res, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.ParticipantResource(): http.Do(")
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, errors.WithMessage(decodeError(res.Body), "twilio.Client.ParticipantResource()")
+	}
+
+	resource := &struct {
+		Participants []ParticipantResource
+	}{}
+
+	if err := json.NewDecoder(res.Body).Decode(resource); err != nil {
+		return nil, errors.WithMessage(err, "twilio.Client.ParticipantResource(): json.Decoder.Decode()")
+	}
+
+	return resource.Participants, nil
 }
