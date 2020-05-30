@@ -2,6 +2,8 @@ package twilio
 
 import (
 	"fmt"
+	"strings"
+	"time"
 )
 
 // CallResource holds the details of a call resouce
@@ -12,8 +14,8 @@ type CallResource struct {
 	AnsweredBy      string          `json:"answered_by,omitempty"`
 	APIVersion      string          `json:"api_version,omitempty"`
 	CallerName      string          `json:"caller_name,omitempty"`
-	DateCreated     string          `json:"date_created,omitempty"`
-	DateUpdated     string          `json:"date_updated,omitempty"`
+	DateCreated     TwilioTime      `json:"date_created,omitempty"`
+	DateUpdated     TwilioTime      `json:"date_updated,omitempty"`
 	Direction       string          `json:"direction,omitempty"`
 	Duration        string          `json:"duration,omitempty"`
 	EndTime         string          `json:"end_time,omitempty"`
@@ -44,7 +46,7 @@ type SubresourceUris struct {
 	Payments          string `json:"payments,omitempty"`
 }
 
-// Call describes a outgoing call settings
+// Call describes outgoing call settings
 type Call struct {
 	AccountSid                         string `url:"AccountSid,omitempty"`
 	ApplicationSid                     string `url:"ApplicationSid,omitempty"`
@@ -81,6 +83,40 @@ type Call struct {
 	URL                                string `url:"Url,omitempty"`
 }
 
+// ConferenceResource holds the details of a conference
+type ConferenceResource struct {
+	AccountSid              string            `json:"account_sid,omitempty"`
+	DateCreated             TwilioTime        `json:"date_created,omitempty"`
+	DateUpdated             TwilioTime        `json:"date_updated,omitempty"`
+	ApiVersion              string            `json:"api_version,omitempty"`
+	FriendlyName            string            `json:"friendly_name,omitempty"`
+	Region                  string            `json:"region,omitempty"`
+	Sid                     string            `json:"sid,omitempty"`
+	Status                  string            `json:"status,omitempty"` // init, in-progress, or completed.
+	Uri                     string            `json:"uri,omitempty"`
+	SubresourceUris         map[string]string `json:"subresource_uris,omitempty"`
+	ReasonConferenceEnded   string            `json:"reason_conference_ended,omitempty"` // conference-ended-via-api, participant-with-end-conference-on-exit-left, participant-with-end-conference-on-exit-kicked, last-participant-kicked, or last-participant-left.
+	CallSidEndingConference string            `json:"call_sid_ending_conference,omitempty"`
+}
+
+// ParticipantResource holds the details of a participant
+type ParticipantResource struct {
+	AccountSid             string     `json:"account_sid,omitempty"`
+	CallSid                string     `json:"call_sid,omitempty"`
+	CallSidToCoach         string     `json:"call_sid_to_coach,omitempty"`
+	Coaching               bool       `json:"coaching,omitempty"`
+	ConferenceSid          string     `json:"conference_sid,omitempty"`
+	DateCreated            TwilioTime `json:"date_created,omitempty"`
+	DateUpdated            TwilioTime `json:"date_updated,omitempty"`
+	EndConferenceOnExit    bool       `json:"end_conference_on_exit,omitempty"`
+	Muted                  bool       `json:"muted,omitempty"`
+	Hold                   bool       `json:"hold,omitempty"`
+	StartConferenceOnEnter bool       `json:"start_conference_on_enter,omitempty"`
+	Status                 string     `json:"status,omitempty"` // queued, connecting, ringing, connected, complete, or failed
+	Uri                    string     `json:"uri,omitempty"`
+}
+
+// APIError holds the details of errors returned from twilio
 type APIError struct {
 	Code     int    `json:"code"`
 	Message  string `json:"message"`
@@ -88,6 +124,33 @@ type APIError struct {
 	Status   int    `json:"status"`
 }
 
+// Error returns string representation of the error
 func (a *APIError) Error() string {
 	return fmt.Sprintf("APIError: %s: more_info: %s", a.Message, a.MoreInfo)
+}
+
+// TwilioTime implements interfaces for json Marshalling and Unmarshalling
+type TwilioTime struct {
+	time.Time
+}
+
+const ttLayout = "Mon, 02 Jan 2006 15:04:05 -0700" // 2006/01/02|15:04:05
+
+// UnmarshalJSON implements the Unmarshaler interface
+func (tt *TwilioTime) UnmarshalJSON(b []byte) (err error) {
+	s := strings.Trim(string(b), "\"")
+	if s == "null" {
+		tt.Time = time.Time{}
+		return
+	}
+	tt.Time, err = time.Parse(ttLayout, s)
+	return
+}
+
+// MarshslJSON implements the Marshaler interface
+func (tt *TwilioTime) MarshalJSON() ([]byte, error) {
+	if tt.Time.IsZero() {
+		return []byte("null"), nil
+	}
+	return []byte(fmt.Sprintf("\"%s\"", tt.Time.Format(ttLayout))), nil
 }
