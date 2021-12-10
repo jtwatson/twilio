@@ -199,7 +199,7 @@ func (c *Client) ConferenceResource(ctx context.Context, conferenceSid string) (
 }
 
 // ParticipantResource retrieves participant details
-func (c *Client) ParticipantResources(ctx context.Context, conferenceSid string) ([]ParticipantResource, error) {
+func (c *Client) ParticipantResources(ctx context.Context, conferenceSid string) ([]*ParticipantResource, error) {
 	ctx, span := trace.StartSpan(ctx, "twilio.Client.ParticipantResource()")
 	defer span.End()
 
@@ -221,7 +221,7 @@ func (c *Client) ParticipantResources(ctx context.Context, conferenceSid string)
 	}
 
 	resource := &struct {
-		Participants []ParticipantResource
+		Participants []*ParticipantResource
 	}{}
 
 	if err := json.NewDecoder(res.Body).Decode(resource); err != nil {
